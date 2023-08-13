@@ -1,9 +1,9 @@
-# @mizchi/qwik-svelte
+# @mizchi/qwik-vue
 
-Qwikify svelte components on qwik.
+Qwikify vue components on qwik.
 
 ```bash
-$ npm install @mizchi/qwik-svelte @sveltejs/vite-plugin-svelte svelte svelte-preprocess -D
+$ npm install @mizchi/qwik-vue @vitejs/plugin-vue vue -D
 ```
 
 **CAUTION** - This is PoC phase. You should check it works on your app.
@@ -12,67 +12,49 @@ $ npm install @mizchi/qwik-svelte @sveltejs/vite-plugin-svelte svelte svelte-pre
 
 ### vite.config.ts
 
-Setup svelte ssr with `@sveltejs/vite-plugin-svelte`.
-
 ```ts
 import { defineConfig } from "vite";
 import { qwikVite } from "@builder.io/qwik/optimizer";
-import sveltePreprocess from "svelte-preprocess";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import vue from "@vitejs/plugin-vue";
 
-export default defineConfig((options) => {
+export default defineConfig(() => {
   return {
     plugins: [
-      // with ssr config
-      svelte({
-        preprocess: sveltePreprocess(),
-        compilerOptions: {
-          generate: options.mode === "ssr" ? "ssr" : "dom",
-          hydratable: true,
-        },
-      }),
+      vue(),
       qwikVite()
     ],
   };
 });
 ```
 
-(To use `@sveltejs/vite-plugin-svelte`, you may need `"type": "module"` in `package.json`)
+### Use vue components
 
-### Use svelte components
-
-```svelte
-<!-- src/components/App.svelte -->
-<script lang="ts">
-  export let name: string;
-  let count = 0;
+```vue
+<!-- src/components/App.vue -->
+<script setup>
+import { ref, defineProps } from 'vue';
+const props = defineProps(["counter"]);
+const count = ref(0);
 </script>
 
-<div class="app">
-  <h1>Hello {name}!</h1>
-  <button on:click={() => count++}>{count}</button>
-</div>
-
-<style>
-  h1 {
-    color: blue;
-  }
-</style>
+<template>
+  <div>{{props.counter}}</div>
+  <button @click="count++">You clicked me {{ count }} times.</button>
+</template>
 ```
 
-Render with `qwikifySvelte$`
+Render with `qwikifyVue$`
 
 ```tsx
-import App from "./components/App.svelte";
-import { qwikifySvelte$ } from "@mizchi/qwik-svelte";
-
-const QApp = qwikifySvelte$<{name: string}>(App, {
+import { component$ } from "@builder.io/qwik";
+import App from "./components/App.vue";
+import { qwikifyVue$ } from "@mizchi/qwik-vue";
+const QApp = qwikifyVue$<{counter: number}>(App, {
   eagerness: 'load',
 });
-
-export default () => {
-  return <QApp name="svelte"/>;
-};
+export default component$(() => {
+  return <QApp counter={0} />;
+});
 ```
 
 ---
@@ -92,14 +74,7 @@ $ pnpm build # emit lib files
 
 - [ ] unit testing
 - [ ] `<Slot>`
-- [ ] Check re-render with props change
-- [ ] Props types for svelte component
-
-## My motivation
-
-Looking at [qwik-react](https://github.com/BuilderIO/qwik/tree/main/packages/qwik-react), I felt that qwik could be treated as a meta-framework that could replace astro. qwik itself would be kept to the core for describing the critical path, calling the runtime when hydration occurs.
-
-Therefore, I first tried targeting svelte, which is not JSX.
+- [ ] Props types for vue component
 
 ## LICENSE
 

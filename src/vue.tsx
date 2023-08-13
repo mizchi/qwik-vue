@@ -14,28 +14,17 @@ import {
   useOnDocument,
   SkipRender,
 } from '@builder.io/qwik';
-
 import { isBrowser, isServer } from '@builder.io/qwik/build';
-import type { ComponentType } from 'svelte';
-// TODO: declare self
 import type { QwikifyProps } from "./types";
+import { h, createSSRApp, ref, type Ref } from "vue";
+import { renderToString } from "vue/server-renderer";
+import { type Component as VueComponent, ComponentPublicInstance } from "vue";
 
 interface QwikifyOptions {
   tagName?: string;
   eagerness?: 'load' | 'visible' | 'idle' | 'hover';
   event?: string | string[];
   clientOnly?: boolean;
-}
-
-type IsoSvelteCmp = (ComponentType<any>) | {
-  render: (props: any) => {
-    html: string;
-    css: {
-      code: string;
-      map: string;
-    },
-    head: string
-  }
 }
 
 const useWakeupSignal = (props: QwikifyProps<{}>, opts: QwikifyOptions = {}) => {
@@ -66,52 +55,55 @@ const useWakeupSignal = (props: QwikifyProps<{}>, opts: QwikifyOptions = {}) => 
 };
 
 
+type VueClientCtx<P> = {instance: ComponentPublicInstance, ssrCtx: Ref<P>}
 // TODO: Slot not supported yet
-export function qwikifySvelteQrl<PROPS extends {}>(
-  isoCmp$: QRL<IsoSvelteCmp>,
+export function qwikifyVueQrl<PROPS extends {}>(
+  Cmp$: QRL<VueComponent>,
   opts?: QwikifyOptions
 ) {
   return component$((props: QwikifyProps<PROPS>) => {
-    // const { scopeId } = useStylesScoped$(
-    //   `q-slot{display:none} q-slotc,q-slotc>q-slot{display:contents}`
-    // );
     const hostRef = useSignal<Element>();
-    const internalState = useSignal<NoSerialize<any>>();
-    const appState = useSignal<NoSerialize<{instance?: any, html?: string}>>();
+    const appState = useSignal<NoSerialize<VueClientCtx<PROPS>>>();
     const [signal, isClientOnly] = useWakeupSignal(props, opts);
-    // const hydrationKeys = {};
-    const TagName = opts?.tagName ?? ('qwik-svelte' as any);
+    const TagName = opts?.tagName ?? ('qwik-vue' as any);
     useTask$(async ({ track }) => {
       const trackedProps = track(() => ({ ...props }));
       track(signal);
       if (!isBrowser) return;
-      const ClientCmp: any = await isoCmp$.resolve();
-      if (internalState.value) {
-        if (internalState.value.root) {
-          appState.value?.instance.$set(trackedProps);
-        }
-      } else {
-        const hostElement = hostRef.value;
-        if (hostElement) {
-          const app = new ClientCmp({
-            target: hostElement,
-            hydrate: true,
-            props: trackedProps,
-          });
-          appState.value = noSerialize({
-            instance: app,
-          });
-        }
+      const Cmp: any = await Cmp$.resolve();
+      if (appState.value) {
+        appState.value.ssrCtx.value = {...trackedProps} as PROPS;
+        return;
+      }
+      if (hostRef.value) {
+        const ssrCtx = ref({...trackedProps}) as any;
+        const instance = createSSRApp({
+          inject: ['__ssrCtx'],
+          render() {
+            return h(Cmp, ssrCtx.value)
+          },
+        })
+          .provide('__ssrCtx', ssrCtx)
+          .mount(hostRef.value, true);
+        // const instance = app.mount(hostRef.value, true);
+        appState.value = noSerialize({
+          instance,
+          ssrCtx,
+        });
       }
     });
     if (isServer && !isClientOnly) {
-      const renderer = isoCmp$.resolve();
-      return <RenderOnce key={2}>
+      const cmpLoading = Cmp$.resolve();
+      return <RenderOnce>
         <TagName ref={hostRef}>
-          {renderer.then((renderer: any) => {
-            const markup = renderer.render({...props});
-            const result = `<style>${markup.css?.code}</style>${markup.html}`;
-            return <SSRRaw data={result}/>;  
+          {cmpLoading.then(async (Cmp: any) => {
+            const ssrApp = createSSRApp({
+              render() {
+                return h(Cmp, props)
+              },
+            });
+            const html = await renderToString(ssrApp);
+            return <SSRRaw data={html}/>;  
           })}
         </TagName>
       </RenderOnce>;
@@ -131,4 +123,4 @@ export function qwikifySvelteQrl<PROPS extends {}>(
   });
 }
 
-export const qwikifySvelte$ = /*#__PURE__*/ implicit$FirstArg(qwikifySvelteQrl);
+export const qwikifyVue$ = /*#__PURE__*/ implicit$FirstArg(qwikifyVueQrl);

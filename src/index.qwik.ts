@@ -1,1 +1,1 @@
-export { qwikifySvelte$, qwikifySvelteQrl } from './qwikify';
+export { qwikifyVue$, qwikifyVueQrl } from './vue';

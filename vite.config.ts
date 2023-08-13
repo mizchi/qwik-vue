@@ -1,9 +1,8 @@
 import { defineConfig } from "vite";
 import { qwikVite } from "@builder.io/qwik/optimizer";
-import sveltePreprocess from "svelte-preprocess";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import vue from "@vitejs/plugin-vue";
 
-export default defineConfig((options) => {
+export default defineConfig(() => {
   return {
     build: {
       target: "es2020",
@@ -16,21 +15,14 @@ export default defineConfig((options) => {
         external: [
           '@builder.io/qwik',
           '@builder.io/qwik/build',
-          'svelte',
-          'svelte/compiler',
-          'svelte/internal',
+          "vue",
+          "vue/runtime",
+          'vue/server-renderer',
         ],
       }
     },
     plugins: [
-      svelte({
-        preprocess: sveltePreprocess(),
-        compilerOptions: {
-          // @ts-ignore
-          generate: options.mode === "ssr" ? "ssr" as const : "dom" as const,
-          hydratable: true,
-        },
-      }),
+      vue({}),
       qwikVite()
     ],
   };

@@ -1,11 +1,23 @@
-// import { Counter } from "./components/counter/counter";
-// import { Logo } from "./components/logo/logo";
+import { component$, useSignal } from "@builder.io/qwik";
+// @ts-ignore
+import VueApp from "./components/App.vue";
+import { qwikifyVue$ } from "./vue";
 
-import App from "./components/App.svelte";
-import {qwikifySvelte$} from "./qwikify";
-
-const QApp = qwikifySvelte$<{name: string}>(App, {
+const QApp = qwikifyVue$<{counter: number}>(VueApp, {
   eagerness: 'load',
+});
+
+const Root = component$(() => {
+  const counter = useSignal(1);
+  return (
+    <>
+      <h2>Qwik</h2>
+      <button onClick$={() => counter.value++}>{counter.value}</button>
+      <hr />
+      <h3>Vue</h3>
+      <QApp counter={counter.value} />
+    </>
+  );
 });
 
 export default () => {
@@ -16,7 +28,8 @@ export default () => {
         <title>Qwik Blank App</title>
       </head>
       <body>
-        <QApp name="svelte"/>
+        <Root />
+        {/* <QApp name="svelte"/> */}
       </body>
     </>
   );
