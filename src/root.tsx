@@ -3,7 +3,7 @@ import { component$, useSignal } from "@builder.io/qwik";
 import VueApp from "./components/App.vue";
 import { qwikifyVue$ } from "./vue";
 
-const QApp = qwikifyVue$<{counter: number}>(VueApp, {
+const QApp = qwikifyVue$<{counter: number, onUpdate: (current: number) => void}>(VueApp, {
   eagerness: 'load',
 });
 
@@ -15,7 +15,13 @@ const Root = component$(() => {
       <button onClick$={() => counter.value++}>{counter.value}</button>
       <hr />
       <h3>Vue</h3>
-      <QApp counter={counter.value} />
+      <QApp
+        counter={counter.value}
+        onUpdate$={(current) => {
+          console.log('[root:onUpdate]', current);
+        }}
+        // client:only={true}
+      />
     </>
   );
 });
@@ -29,7 +35,6 @@ export default () => {
       </head>
       <body>
         <Root />
-        {/* <QApp name="svelte"/> */}
       </body>
     </>
   );

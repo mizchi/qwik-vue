@@ -1,7 +1,10 @@
-<script setup>
-import { ref, defineProps } from 'vue';
-const props = defineProps(["counter"]);
-const count = ref(0);
+<script setup lang="ts">
+  import { ref, defineProps, watch } from 'vue';
+  const props = defineProps<{counter: number, onUpdate: (current: number) => void}>();
+  const count = ref(0);
+  watch(count, (val) => {
+    props.onUpdate(val);
+  });
 </script>
 
 <template>
