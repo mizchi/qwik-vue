@@ -18,7 +18,7 @@ import { isBrowser, isServer } from '@builder.io/qwik/build';
 import type { QwikifyProps } from "./types";
 import { h, createSSRApp, ref, type Ref } from "vue";
 import { renderToString } from "vue/server-renderer";
-import { type Component as VueComponent, ComponentPublicInstance } from "vue";
+import { type Component as VueComponent, ComponentPublicInstance, App as VueApp } from "vue";
 
 interface QwikifyOptions {
   tagName?: string;
@@ -27,7 +27,7 @@ interface QwikifyOptions {
   clientOnly?: boolean;
 }
 
-type VueClientCtx<P> = {instance: ComponentPublicInstance, ssrCtx: Ref<P>}
+type VueClientCtx<P> = { app: VueApp, instance: ComponentPublicInstance, ssrCtx: Ref<P>}
 // TODO: Slot not supported yet
 export function qwikifyVueQrl<PROPS extends {}>(
   Cmp$: QRL<VueComponent>,
@@ -38,30 +38,40 @@ export function qwikifyVueQrl<PROPS extends {}>(
     const appState = useSignal<NoSerialize<VueClientCtx<PROPS>>>();
     const [signal, isClientOnly] = useWakeupSignal(props, opts);
     const TagName = opts?.tagName ?? ('qwik-vue' as any);
-    useTask$(async ({ track }) => {
+    useTask$(async ({ track, cleanup }) => {
       const trackedProps = track(() => ({ ...props }));
       track(signal);
       if (!isBrowser) return;
-      const Cmp: any = await Cmp$.resolve();
+      const Cmp = await Cmp$.resolve();
       if (appState.value) {
         appState.value.ssrCtx.value = {...toVueProps(trackedProps)} as PROPS;
         return;
       }
       if (hostRef.value) {
         const ssrCtx = ref({...toVueProps(trackedProps)}) as Ref<PROPS>;
-        const instance = createSSRApp({
+        const app = createSSRApp({
           inject: ['__ssrCtx'],
           render() {
             return h(Cmp, ssrCtx.value)
           },
         })
-          .provide('__ssrCtx', ssrCtx)
-          .mount(hostRef.value, true);
+          .provide('__ssrCtx', ssrCtx);
+        const instance = app.mount(hostRef.value, true);
         appState.value = noSerialize({
+          app,
           instance,
           ssrCtx,
         });
       }
+      cleanup(() => {
+        if (appState.value && !signal.value) {
+          appState.value.app.unmount();
+          appState.value = undefined;
+          signal.value = false;
+          hostRef.value = undefined;
+          console.log("unmount!");
+        }
+      });
     });
     if (isServer && !isClientOnly) {
       const cmpLoading = Cmp$.resolve();
@@ -83,7 +93,17 @@ export function qwikifyVueQrl<PROPS extends {}>(
       <RenderOnce>
         <TagName
           {...props}
-          ref={hostRef}
+          ref={(el: Element) => {
+            if (isBrowser) {
+              queueMicrotask(() => {
+                // check re-monut
+                if (!signal.value) signal.value = true;
+                if (!hostRef.value) hostRef.value = el;
+              });
+            } else {
+              hostRef.value = el;
+            }
+          }}
         >
           {SkipRender}
         </TagName>
